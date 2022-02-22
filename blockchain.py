@@ -84,3 +84,13 @@ app = Flask(__name__)
 node_identifier = str(uuid4()).replace('-','')
 # instantiate the Blockchain
 blockchain = Blockchain()
+
+# return the entire blockchain
+@app.route('/blockchain', methods=['GET'])
+def full_chain():
+    response = {
+        'chain': blockchain.chain,
+        'length': len(blockchain.chain),
+    }
+
+    return jsonify(response), 200
