@@ -1,3 +1,4 @@
+from crypt import methods
 import sys
 
 import hashlib
@@ -28,8 +29,8 @@ class Blockchain(object):
         # create the genesis block with a specific fixed hash of previous block (genesis block starts with index 0)
         genesis_hash = self.hash_block("genesis_block")
         self.append_block(
-            hash_of_previous_block = genesis_hash,
-            nonce = self.proof_of_work(0, genesis_hash, [])
+            hash_of_previous_block=genesis_hash,
+            nonce=self.proof_of_work(0, genesis_hash, []),
         )
 
     # use PoW to find the nonce for the current block
@@ -37,26 +38,29 @@ class Blockchain(object):
         # try wirh nonce = 0
         nonce = 0
         # try hashing the nonce together with the hash of the previous block until it is valid
-        while self.valid_proof(index, hash_of_previous_block, transactions, nonce) is False:
-            nonce += 1        
+        while (
+            self.valid_proof(index, hash_of_previous_block, transactions, nonce)
+            is False
+        ):
+            nonce += 1
         return nonce
 
     def valid_proof(self, index, hash_of_previous_block, transactions, nonce):
         # create a string containing the hash of the previous block and the  block content, including the nonce
-        content = f'{index}{hash_of_previous_block}{transactions}{nonce}'.encode()
+        content = f"{index}{hash_of_previous_block}{transactions}{nonce}".encode()
         # hash using sha256
         content_hash = hashlib.sha256(content).hexdigest()
         # check if the hash meets the difficulty target
-        return content_hash[:len(self.difficulty_target)] == self.difficulty_target
+        return content_hash[: len(self.difficulty_target)] == self.difficulty_target
 
     # creates a new block and adds it to the blockchain
     def append_block(self, nonce, hash_of_previous_block):
         block = {
-            'index': len(self.chain),
-            'timestamp': time(),
-            'transactions': self.current_transactions,
-            'nonce': nonce,
-            'hash_of_previous_block': hash_of_previous_block
+            "index": len(self.chain),
+            "timestamp": time(),
+            "transactions": self.current_transactions,
+            "nonce": nonce,
+            "hash_of_previous_block": hash_of_previous_block,
         }
         # reset the current list of transactions
         self.current_transactions = []
@@ -65,12 +69,14 @@ class Blockchain(object):
         return block
 
     def add_transaction(self, sender, recipient, amount):
-        self.current_transactions.append({
-            'amount': amount,
-            'recipient': recipient,
-            'sender': sender,
-        })
-        return self.last_block['index'] + 1
+        self.current_transactions.append(
+            {
+                "amount": amount,
+                "recipient": recipient,
+                "sender": sender,
+            }
+        )
+        return self.last_block["index"] + 1
 
     @property
     def last_block(self):
@@ -78,44 +84,64 @@ class Blockchain(object):
         return self.chain[-1]
 
 
-
 app = Flask(__name__)
 
 # generate a globally unique address for this node
-node_identifier = str(uuid4()).replace('-','')
+node_identifier = str(uuid4()).replace("-", "")
 # instantiate the Blockchain
 blockchain = Blockchain()
 
 # return the entire blockchain
-@app.route('/blockchain', methods=['GET'])
+@app.route("/blockchain", methods=["GET"])
 def full_chain():
     response = {
-        'chain': blockchain.chain,
-        'length': len(blockchain.chain),
+        "chain": blockchain.chain,
+        "length": len(blockchain.chain),
     }
     return jsonify(response), 200
 
-@app.route('/mine', methods=['GET'])
+
+@app.route("/mine", methods=["GET"])
 def mine_block():
-    blockchain.add_transaction(
-        sender="0",
-        recipient=node_identifier,
-        amount=1
-    )
+    blockchain.add_transaction(sender="0", recipient=node_identifier, amount=1)
 
     # obtain the hash of last block in the blockchain
     last_block_hash = blockchain.hash_block(blockchain.last_block)
 
     # using PoW, get the nonce for the new block to be added tho the blockchain
     index = len(blockchain.chain)
-    nonce = blockchain.proof_of_work(index, last_block_hash, blockchain.current_transactions)
+    nonce = blockchain.proof_of_work(
+        index, last_block_hash, blockchain.current_transactions
+    )
     # add the new block to blockchain using the last block hash and the current nonce
     block = blockchain.append_block(nonce, last_block_hash)
     response = {
-        'message': "New Block Mined",
-        'index': block['index'],
-        'hash_of_previous_block': block['hash_of_previous_block'],
-        'nonce': block['nonce'],
-        'transactions': block['transactions'],
+        "message": "New Block Mined",
+        "index": block["index"],
+        "hash_of_previous_block": block["hash_of_previous_block"],
+        "nonce": block["nonce"],
+        "transactions": block["transactions"],
     }
     return jsonify(response), 200
+
+
+@app.route("/transactions/new", methods=["POST"])
+def new_transaction():
+    # get the value passed in from the client
+    values = request.get_json()
+
+    # check that the required filds are in the post'ed dat
+    required_fields = ["sender", "recipient", "amount"]
+    if not all(k in values for k in required_fields):
+        return ("Missing values", 400)
+
+    # create a new transaction
+    index = blockchain.add_transaction(
+        values["sender"], values["recipient"], values["amount"]
+    )
+    response = {"message": f"Transaction will be added to Block {index}"}
+    return (jsonify(response), 201)
+
+
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=int(sys.argv[1]))
