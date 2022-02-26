@@ -22,8 +22,10 @@ class Blockchain(object):
         return hashlib.sha256(block_encoded).hexdigest()
 
     def __init__(self):
+        self.nodes = set()
         # stores all blocks in the entire blockchain
         self.chain = []
+
         # temporarily stores the transactions for the current block
         self.current_transactions = []
         # create the genesis block with a specific fixed hash of previous block (genesis block starts with index 0)
@@ -78,10 +80,45 @@ class Blockchain(object):
         )
         return self.last_block["index"] + 1
 
+    def add_node(self, address):
+        parsed_url = urlparse(address)
+        self.nodes.add(parsed_url.netloc)
+        print(parsed_url.netloc)
+
     @property
     def last_block(self):
         # rerturns the last block in the blockchain
         return self.chain[-1]
+
+    # determine if the given blockchain is valid
+    def valid_chain(self, chain):
+        last_block = chain[0]
+        current_index = 1
+
+        while current_index < len(chain):
+            block = chain[current_index]
+            if block['hash_of_previous_block'] != self.hash_block(last_block):
+                return False
+
+            # check for valid nonce
+            if not self.valid_proof(current_index, block['hash_of_previous_block'], block['transactions'], block['nonce']):
+                return False
+
+            #move on to the next block on the chain
+            last_block = block
+            current_index += 1
+
+        # the chain is valid
+        return True
+
+    def update_blockchain(self):
+        # get the nodes around us that have been registered
+        neighbours = self.nodes
+        new_chain = None
+
+        #for simplicity, look for chains longer than ours
+        max_length = len(self.chain)
+        
 
 
 app = Flask(__name__)
