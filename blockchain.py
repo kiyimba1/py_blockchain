@@ -97,14 +97,19 @@ class Blockchain(object):
 
         while current_index < len(chain):
             block = chain[current_index]
-            if block['hash_of_previous_block'] != self.hash_block(last_block):
+            if block["hash_of_previous_block"] != self.hash_block(last_block):
                 return False
 
             # check for valid nonce
-            if not self.valid_proof(current_index, block['hash_of_previous_block'], block['transactions'], block['nonce']):
+            if not self.valid_proof(
+                current_index,
+                block["hash_of_previous_block"],
+                block["transactions"],
+                block["nonce"],
+            ):
                 return False
 
-            #move on to the next block on the chain
+            # move on to the next block on the chain
             last_block = block
             current_index += 1
 
@@ -116,17 +121,17 @@ class Blockchain(object):
         neighbours = self.nodes
         new_chain = None
 
-        #for simplicity, look for chains longer than ours
+        # for simplicity, look for chains longer than ours
         max_length = len(self.chain)
 
         # grab and verify the chains from all the nodes in our network
         for node in neighbours:
-            # get the blockchain from other nodes 
-            response = requests.get(f'http://{node}/blockchain')
+            # get the blockchain from other nodes
+            response = requests.get(f"http://{node}/blockchain")
 
             if response.status_code == 200:
-                length = response.json()['length']
-                chain = response.json()['chain']
+                length = response.json()["length"]
+                chain = response.json()["chain"]
             # check if the length is longer and the chain is valid
             if length > max_length and self.valid_chain(chain):
                 max_length = length
@@ -137,8 +142,6 @@ class Blockchain(object):
             return True
 
         return False
-
-
 
 
 app = Flask(__name__)
@@ -200,11 +203,11 @@ def new_transaction():
     return (jsonify(response), 201)
 
 
-@app.route('/nodes/add_nodes', methods=['POST'])
+@app.route("/nodes/add_nodes", methods=["POST"])
 def add_nodes():
     # get the nodes passed in from the client
     values = request.get_json()
-    nodes = values.get('nodes')
+    nodes = values.get("nodes")
     if nodes is None:
         return "Error: Missing node(s) info", 400
 
@@ -212,10 +215,26 @@ def add_nodes():
         blockchain.add_node(node)
 
     response = {
-        'message': 'New nodes added',
-        'nodes': list(blockchain.nodes),
+        "message": "New nodes added",
+        "nodes": list(blockchain.nodes),
     }
     return jsonify(response), 201
+
+
+@app.route("/nodes/sync", methods=["GET"])
+def sync():
+    updated = blockchain.update_blockchain()
+    if updated:
+        response = {
+            "message": "The blockchain has been updated to the latest",
+            "blockchain": blockchain.chain,
+        }
+    else:
+        response = {
+            "message": "Our blockchain is the latest",
+            "blockchain": blockchain.chain,
+        }
+    return jsonify(response), 200
 
 
 if __name__ == "__main__":
