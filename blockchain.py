@@ -200,5 +200,23 @@ def new_transaction():
     return (jsonify(response), 201)
 
 
+@app.route('/nodes/add_nodes', methods=['POST'])
+def add_nodes():
+    # get the nodes passed in from the client
+    values = request.get_json()
+    nodes = values.get('nodes')
+    if nodes is None:
+        return "Error: Missing node(s) info", 400
+
+    for node in nodes:
+        blockchain.add_node(node)
+
+    response = {
+        'message': 'New nodes added',
+        'nodes': list(blockchain.nodes),
+    }
+    return jsonify(response), 201
+
+
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=int(sys.argv[1]))
